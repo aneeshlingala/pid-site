@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin - Article Publisher</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f7f7f7;
+      color: #333;
+    }
+    .hidden {
+      display: none;
+    }
+    .toolbar button, .toolbar select {
+      margin-right: 10px;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      font-size: 1rem;
+    }
+    .preview {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #fff;
+      border: 1px solid #ddd;
+    }
+    #articles-list {
+      margin-top: 2rem;
+    }
+    .article-item {
+      border: 1px solid #ccc;
+      background: #fff;
+      padding: 0.75rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 5px;
+    }
+    .article-info {
+      max-width: 80%;
+      overflow-wrap: break-word;
+    }
+    .article-title {
+      font-weight: bold;
+      margin: 0 0 0.25rem;
+    }
+    .article-date {
+      font-size: 0.85rem;
+      color: #666;
+    }
+    button.delete-article {
+      background: #d9534f;
+      border: none;
+      color: white;
+      padding: 0.25rem 0.5rem;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button.delete-all {
+      background: #a94442;
+      border: none;
+      color: white;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛠 Admin Panel</h1>
+  <div id="login">
+    <p>Password: <input type="password" id="password"><button onclick="checkPassword()">Login</button></p>
+  </div>
+
+  <div id="editor" class="hidden">
+    <div class="toolbar">
+      <button onclick="insertMarkdown('**', '**')"><b>Bold</b></button>
+      <button onclick="insertMarkdown('_', '_')"><i>Italic</i></button>
+      <button onclick="insertMarkdown('<u>', '</u>')"><u>Underline</u></button>
+      <select id="fontSelect" onchange="setFont(this.value)">
+        <option value="">Font</option>
+        <option value="Arial">Arial</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+      </select>
+    </div>
+
+    <input type="text" id="title" placeholder="Article Title" style="width: 100%; margin: 1rem 0;" />
+    <textarea id="markdown" oninput="updatePreview()"></textarea>
+
+    <h3>Live Preview</h3>
+    <div class="preview" id="preview"></div>
+
+    <button onclick="saveArticle()">Publish Article</button>
+
+    <hr>
+
+    <h2>Published Articles</h2>
+    <div id="articles-list"></div>
+    <button class="delete-all" onclick="deleteAllArticles()">Delete All Articles</button>
+  </div>
+
+  <script>
+    function checkPassword() {
+      const correct = "pangopass";
+      const input = document.getElementById("password").value;
+      if (input === correct) {
+        document.getElementById("login").style.display = "none";
+        document.getElementById("editor").classList.remove("hidden");
+        loadArticlesList();
+      } else {
+        alert("Wrong password!");
+      }
+    }
+
+    function insertMarkdown(openTag, closeTag) {
+      const textarea = document.getElementById("markdown");
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      const selected = text.substring(start, end);
+      const newText = text.substring(0, start) + openTag + selected + closeTag + text.substring(end);
+      textarea.value = newText;
+      updatePreview();
+      // Put cursor inside inserted markdown if nothing was selected
+      if (start === end) {
+        textarea.selectionStart = textarea.selectionEnd = start + openTag.length;
+      }
+      textarea.focus();
+    }
+
+    function setFont(font) {
+      document.getElementById("preview").style.fontFamily = font;
+    }
+
+    function updatePreview() {
+      const md = document.getElementById("markdown").value;
+      document.getElementById("preview").innerHTML = marked.parse(md);
+    }
+
+    function saveArticle() {
+      const title = document.getElementById("title").value.trim();
+      const content = document.getElementById("markdown").value.trim();
+      if (!title || !content) {
+        alert("Title and content required.");
+        return;
+      }
+      const articles = JSON.parse(localStorage.getItem("articles") || "[]");
+      articles.unshift({ title, content, date: new Date().toISOString() });
+      localStorage.setItem("articles", JSON.stringify(articles));
+      alert("Article published!");
+      document.getElementById("title").value = "";
+      document.getElementById("markdown").value = "";
+      document.getElementById("preview").innerHTML = "";
+      loadArticlesList();
+    }
+
+    function loadArticlesList() {
+      const articlesList = document.getElementById("articles-list");
+      const articles = JSON.parse(localStorage.getItem("articles") || "[]");
+      if (articles.length === 0) {
+        articlesList.innerHTML = "<p>No articles published yet.</p>";
+        return;
+      }
+      articlesList.innerHTML = "";
+      articles.forEach((article, index) => {
+        const item = document.createElement("div");
+        item.className = "article-item";
+
+        const info = document.createElement("div");
+        info.className = "article-info";
+        const titleEl = document.createElement("p");
+        titleEl.className = "article-title";
+        titleEl.textContent = article.title;
+        const dateEl = document.createElement("p");
+        dateEl.className = "article-date";
+        dateEl.textContent = new Date(article.date).toLocaleString();
+
+        info.appendChild(titleEl);
+        info.appendChild(dateEl);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-article";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => {
+          if(confirm(`Delete article "${article.title}"?`)) {
+            deleteArticle(index);
+          }
+        };
+
+        item.appendChild(info);
+        item.appendChild(deleteBtn);
+
+        articlesList.appendChild(item);
+      });
+    }
+
+    function deleteArticle(index) {
+      const articles = JSON.parse(localStorage.getItem("articles") || "[]");
+      if (index >= 0 && index < articles.length) {
+        articles.splice(index, 1);
+        localStorage.setItem("articles", JSON.stringify(articles));
+        loadArticlesList();
+      }
+    }
+
+    function deleteAllArticles() {
+      if(confirm("Delete ALL articles? This cannot be undone.")) {
+        localStorage.removeItem("articles");
+        loadArticlesList();
+      }
+    }
+  </script>
+</body>
+</html>
